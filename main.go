@@ -1,10 +1,10 @@
 package main 
 import (
 	"database/sql"
-	
+	"os"
 	"fmt"
 	"log"
-
+	"strings"
 	_ "github.com/microsoft/go-mssqldb"
 
 	"github.com/jmoiron/sqlx"
@@ -140,7 +140,7 @@ type CombinedTable struct {
 func getSQLClient(database string) *sqlx.DB{
 	server := "dgarchive-migration-sqlserver.database.windows.net"
 	username := "r7V4OjohvkX7Wb7x"
-	password := "ZzPeArSqmN3BD7Cj6xUsJM"
+	password := os.Getenv("password")
 	connString := fmt.Sprintf("sqlserver://%s:%s@%s?database=%s&connection+timeout=30",
 		username, password, server, database)
 
@@ -166,29 +166,52 @@ var database1 = "A1_20240521"
 var database2 = "COCLogs_X_A1_20240521"
 
 //fetching data for A1
-func fetchAndPrintDataDB1(db *sqlx.DB, tableName string) ([]TableDB1, error) {
+func fetchAndPrintDataDB1(db *sqlx.DB, tableName string) ([]TableDB1, []int64,  error) {
 	// Using TOP 10 to limit the number of rows retrieved
-	query := fmt.Sprintf("SELECT TOP 2 * FROM %s", tableName)
+	query := fmt.Sprintf("SELECT TOP 10 * FROM %s", tableName)
 	var rows []TableDB1
 	err := db.Select(&rows, query)
 	if err != nil {
 		log.Fatalf("Error querying table %s in db1: %v", tableName, err)
 	}
-		return rows,nil
+
+	var arrdB1[]int64;
+	
+	for _, row := range rows{
+		arrdB1 = append(arrdB1, row.DOCUMENTID)
+	}
+		return rows,arrdB1,nil
 
 }
 
 //fetching data from COC
-func fetchAndPrintDataDB2(db *sqlx.DB, tableName string) ([]TableDB2, error){
-	// Using TOP 10 to limit the number of rows retrieved
-	query := fmt.Sprintf("SELECT TOP 2 * FROM %s", tableName)
+// func fetchAndPrintDataDB2(db *sqlx.DB, tableName string, arrdb1[] int64) ([]TableDB2,  error){
+// 	// Using TOP 10 to limit the number of rows retrieved
+// 	query := fmt.Sprintf("SELECT * FROM %s where %s in (?)", tableName)
+// 	var rows []TableDB2
+// 	err := db.Select(&rows, query)
+// 	if err != nil {
+// 		log.Fatalf("Error querying table %s in db2: %v", tableName, err)
+// 	}
+// 	return rows, nil
+	
+// }
+
+func fetchAndPrintDataDB2(db *sqlx.DB, tableName string, arrdb1 []int64) ([]TableDB2, error) {
+	if len(arrdb1) == 0 {
+		return nil, fmt.Errorf("no DOCUMENTID values found in db1")
+	}
+
+	// Convert arrdb1 to a comma-separated string
+	docIDs := strings.Trim(strings.Join(strings.Fields(fmt.Sprint(arrdb1)), ","), "[]")
+
+	query := fmt.Sprintf("SELECT * FROM %s WHERE DocID IN (%s)", tableName, docIDs)
 	var rows []TableDB2
 	err := db.Select(&rows, query)
 	if err != nil {
 		log.Fatalf("Error querying table %s in db2: %v", tableName, err)
 	}
 	return rows, nil
-	
 }
 
 //joining data
@@ -197,11 +220,12 @@ func joinAndPrintData(db1Data []TableDB1, db2Data []TableDB2) {
 	for _, row := range db2Data {
 		db2Map[row.DOCUMENTID] = row
 	}
+	
 
-	fmt.Println("DB2 Map Keys:")
-	for key := range db2Map {
-		fmt.Println(key)
-	}
+	// fmt.Println("DB2 Map Keys:")
+	// for key := range db2Map {
+	// 	fmt.Println(k)
+	// }
 
 	var combinedData []CombinedTable
 	for _, row1 := range db1Data {
@@ -243,7 +267,7 @@ func joinAndPrintData(db1Data []TableDB1, db2Data []TableDB2) {
 				DB1_MTY_RELEASE_NO: row1.MTY_RELEASE_NO,
 				DB1_JOBORDERNUMBER: row1.JOBORDERNUMBER,
 
-				DB2_DOCUMENTID:              row2.DOCUMENTID,
+
 				DB2_EXPORTDATE:              row2.EXPORTDATE,
 				DB2_DOCUMENTTYPE:            row2.DOCUMENTTYPE,
 				DB2_DOCUMENTNAME:            row2.DOCUMENTNAME,
@@ -292,13 +316,13 @@ func main(){
 	assertNotNil(db2, "coc db is  nil")
 	fmt.Println("Successfully connected to database 2:", database2)
 
-	db1Data, err := fetchAndPrintDataDB1(db1, "HYP_A1_CAT00985")
+	db1Data, arrdb1, err := fetchAndPrintDataDB1(db1, "HYP_A1_CAT00985")
 	if err != nil {
 		log.Fatal(err)
 	}
 	
 
-	db2Data, err := fetchAndPrintDataDB2(db2, "HYP_A1_CAT00985_COC")
+	db2Data, err := fetchAndPrintDataDB2(db2, "HYP_A1_CAT00985_COC", arrdb1)
 	if err != nil {
 		log.Fatal(err)
 	}
