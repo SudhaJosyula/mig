@@ -185,18 +185,6 @@ func fetchAndPrintDataDB1(db *sqlx.DB, tableName string) ([]TableDB1, []int64,  
 }
 
 //fetching data from COC
-// func fetchAndPrintDataDB2(db *sqlx.DB, tableName string, arrdb1[] int64) ([]TableDB2,  error){
-// 	// Using TOP 10 to limit the number of rows retrieved
-// 	query := fmt.Sprintf("SELECT * FROM %s where %s in (?)", tableName)
-// 	var rows []TableDB2
-// 	err := db.Select(&rows, query)
-// 	if err != nil {
-// 		log.Fatalf("Error querying table %s in db2: %v", tableName, err)
-// 	}
-// 	return rows, nil
-	
-// }
-
 func fetchAndPrintDataDB2(db *sqlx.DB, tableName string, arrdb1 []int64) ([]TableDB2, error) {
 	if len(arrdb1) == 0 {
 		return nil, fmt.Errorf("no DOCUMENTID values found in db1")
@@ -221,11 +209,6 @@ func joinAndPrintData(db1Data []TableDB1, db2Data []TableDB2) {
 		db2Map[row.DOCUMENTID] = row
 	}
 	
-
-	// fmt.Println("DB2 Map Keys:")
-	// for key := range db2Map {
-	// 	fmt.Println(k)
-	// }
 
 	var combinedData []CombinedTable
 	for _, row1 := range db1Data {
